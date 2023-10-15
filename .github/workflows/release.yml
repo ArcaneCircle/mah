@@ -1,88 +1,31 @@
-name: release
+name: Release
 
 on:
   push:
-    # Sequence of patterns matched against refs/tags
     tags:
-      - 'v*' # Push events to matching v*, i.e. v1.0, v20.15.10
+      - "v*.*.*"
 
 jobs:
   build:
-    name: Release
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3
-        with:
-          fetch-depth: 0
+      - uses: actions/checkout@v3
 
-      - name: Install node.js
+      - name: Setup node
         uses: actions/setup-node@v3
         with:
           node-version: 16.x
 
-      - name: Write github.io app config
-        run: |
-          echo "{\"name\": \"Mah\", \"editor\":true}" > custom-build-config.json
+      - run: npm install -g pnpm
+      - run: pnpm i
+      - run: pnpm build:prod
 
-      - name: Install dependencies
-        run: |
-          npm install
-
-      - name: Test
-        run: npm run test
-
-      - name: Build GH Pages release
-        run: |
-          npm run build:deploy-ghpages
-
-      - name: Build GH Pages settings
-        run: |
-          touch ./dist/.nojekyll
-
-      - name: Deploy to GH Pages branch 🚀
-        uses: JamesIves/github-pages-deploy-action@releases/v3
+      - name: Release
+        uses: softprops/action-gh-release@v1
         with:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          BRANCH: gh-pages # The branch the action should deploy to.
-          FOLDER: dist # The folder the action should deploy.
-          CLEAN: true
-
-      - name: Write release app config
-        run: |
-          echo "{\"name\": \"Mah\"}" > custom-build-config.json
-
-      - name: Build
-        run: |
-          npm run build:deploy-release
-
-      - name: Create release package
-        run: |
-          cd dist && zip -r ./mah-release.zip .
-
-      - name: Generate release log
-        run: |
-          npm run build:releaselog
-
-      - name: Create release
-        id: create_release
-        uses: actions/create-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref }}
-          release_name: Release ${{ github.ref }}
-          body_path: ./RELEASELOG.md
-          draft: false
-          prerelease: false
-
-      - name: Upload release package
-        id: upload-release-asset
-        uses: actions/upload-release-asset@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          upload_url: ${{ steps.create_release.outputs.upload_url }}
-          asset_path: ./dist/mah-release.zip
-          asset_name: mah-release.zip
-          asset_content_type: application/zip
+          token: ${{ secrets.GITHUB_TOKEN }}
+          body: |
+            Auto-generated release
+          prerelease: ${{ contains(github.event.ref, '-beta') }}
+          fail_on_unmatched_files: true
+          files: ./*.xdc
